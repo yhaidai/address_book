@@ -19,7 +19,9 @@ class ContactListView(ListCreateAPIView):
     serializer_class = ContactSerializer
 
     def get_queryset(self) -> QuerySet[Contact]:
-        return Contact.objects.filter(user=self.request.user)
+        """Filter contacts on the current user and prefetch related `contact_groups` to avoid N+1 problem."""
+        user = self.request.user
+        return Contact.objects.filter(user=user).prefetch_related("contact_groups")
 
 
 class ContactGroupDetailView(RetrieveDestroyAPIView):
@@ -36,4 +38,6 @@ class ContactGroupListView(ListCreateAPIView):
     serializer_class = ContactGroupSerializer
 
     def get_queryset(self) -> QuerySet[ContactGroup]:
-        return ContactGroup.objects.filter(user=self.request.user)
+        """Filter contact groups on the current user and prefetch related `contacts` to avoid N+1 problem."""
+        user = self.request.user
+        return ContactGroup.objects.filter(user=user).prefetch_related("contacts")
