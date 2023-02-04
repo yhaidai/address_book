@@ -1,3 +1,4 @@
+from django.db.models import QuerySet
 from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView
 
 from .serializers import ContactSerializer, ContactGroupSerializer
@@ -15,8 +16,10 @@ class ContactDetailView(RetrieveDestroyAPIView):
 class ContactListView(ListCreateAPIView):
     """View for listing contacts/creating a contact."""
 
-    queryset = Contact.objects.all()
     serializer_class = ContactSerializer
+
+    def get_queryset(self) -> QuerySet[Contact]:
+        return Contact.objects.filter(user=self.request.user)
 
 
 class ContactGroupDetailView(RetrieveDestroyAPIView):
@@ -30,5 +33,7 @@ class ContactGroupDetailView(RetrieveDestroyAPIView):
 class ContactGroupListView(ListCreateAPIView):
     """View for listing contact groups/creating a contact group."""
 
-    queryset = ContactGroup.objects.all()
     serializer_class = ContactGroupSerializer
+
+    def get_queryset(self) -> QuerySet[ContactGroup]:
+        return ContactGroup.objects.filter(user=self.request.user)
