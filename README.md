@@ -1,6 +1,6 @@
 # Address Book
 
-Simple address book application. Users have their contacts and contact lists. A user can create contacts, contact lists, and assign contacts to lists.
+Simple address book application. Users have their contacts and contact groups. A user can create contacts, contact groups, and assign contacts to groups.
 
 [![Built with Cookiecutter Django](https://img.shields.io/badge/built%20with-Cookiecutter%20Django-ff69b4.svg?logo=cookiecutter)](https://github.com/cookiecutter/cookiecutter-django/)
 [![Black code style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)

@@ -73,11 +73,12 @@ THIRD_PARTY_APPS = [
     "rest_framework.authtoken",
     "corsheaders",
     "drf_spectacular",
+    "phonenumber_field",
 ]
 
 LOCAL_APPS = [
     "address_book.users",
-    # Your stuff: custom apps go here
+    "address_book.contacts",
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -291,7 +292,5 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Address Book API",
     "DESCRIPTION": "Documentation of API endpoints of Address Book",
     "VERSION": "1.0.0",
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAdminUser"],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
 }
-# Your stuff...
-# ------------------------------------------------------------------------------
