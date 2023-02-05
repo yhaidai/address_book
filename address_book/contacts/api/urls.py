@@ -2,7 +2,7 @@ from django.urls import path
 
 from address_book.contacts.api.views import (
     ContactDetailView, ContactListView, ContactGroupDetailView, ContactGroupListView, ContactGroupContactListView,
-    ContactGroupContactDetailView,
+    ContactGroupContactDetailView, ContactGroupSearch,
 )
 
 urlpatterns = [
@@ -20,4 +20,5 @@ urlpatterns = [
         ContactGroupContactDetailView.as_view(),
         name="contact_group_contact_detail",
     ),
+    path("contact_groups/search", ContactGroupSearch.as_view(), name="contact_group_search")
 ]

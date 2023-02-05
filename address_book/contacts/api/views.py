@@ -2,8 +2,9 @@ from uuid import UUID
 
 from django.db.models import QuerySet, Manager
 from django.http import Http404
+from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view
 from rest_framework import status
-from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView
+from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView, ListAPIView
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -125,3 +126,26 @@ class ContactGroupContactListView(ListCreateAPIView):
 
         contact_group.contacts.add(contact)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        parameters=[
+            OpenApiParameter(name="name", location=OpenApiParameter.QUERY, description="Name of the contact group"),
+        ],
+    )
+)
+class ContactGroupSearch(ListAPIView):
+    """View for searching contact groups by name."""
+
+    serializer_class = ContactGroupSerializer
+
+    def get_queryset(self) -> QuerySet[ContactGroup]:
+        """
+        Search contact groups for the current user by name (case-insensitive).
+
+        If `name` query parameter is empty - return all contact groups for the current user.
+        """
+        user = self.request.user
+        name_query = self.request.query_params.get("name", "")
+        return ContactGroup.objects.filter(user=user, name__icontains=name_query).prefetch_related("contacts")
