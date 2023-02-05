@@ -1,18 +1,45 @@
 from uuid import UUID
 
-from django.db.models import QuerySet, Manager
+from django.db.models import QuerySet
 from django.http import Http404
-from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view, inline_serializer
 from rest_framework import status
+from rest_framework.fields import UUIDField
 from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView, ListAPIView
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import ContactSerializer, ContactGroupSerializer, ContactGroupContactSerializer
+from .schema_utils import (
+    NOT_FOUND_RESPONSE, CONTACT_RESPONSE, CONTACT_GROUP_RESPONSE, CONTACT_NOT_FOUND_RESPONSE,
+    CONTACT_GROUP_NOT_FOUND_RESPONSE,
+)
+from .serializers import ContactSerializer, ContactGroupSerializer
 from ..models import Contact, ContactGroup
 
 
+@extend_schema_view(
+    get=extend_schema(
+        responses={
+            status.HTTP_404_NOT_FOUND: OpenApiTypes.OBJECT,
+            status.HTTP_200_OK: ContactSerializer,
+        },
+        examples=[
+            NOT_FOUND_RESPONSE,
+            CONTACT_RESPONSE,
+        ],
+    ),
+    delete=extend_schema(
+        responses={
+            status.HTTP_404_NOT_FOUND: OpenApiTypes.OBJECT,
+            status.HTTP_204_NO_CONTENT: None,
+        },
+        examples=[
+            NOT_FOUND_RESPONSE,
+        ],
+    ),
+)
 class ContactDetailView(RetrieveDestroyAPIView):
     """View for retrieving/deleting a particular contact by its UUID."""
 
@@ -21,6 +48,18 @@ class ContactDetailView(RetrieveDestroyAPIView):
     lookup_field = "uuid"
 
 
+@extend_schema_view(
+    get=extend_schema(
+        examples=[
+            CONTACT_RESPONSE,
+        ],
+    ),
+    post=extend_schema(
+        examples=[
+            CONTACT_RESPONSE,
+        ],
+    )
+)
 class ContactListView(ListCreateAPIView):
     """View for listing contacts/creating a contact."""
 
@@ -32,6 +71,27 @@ class ContactListView(ListCreateAPIView):
         return Contact.objects.filter(user=user).prefetch_related("contact_groups")
 
 
+@extend_schema_view(
+    get=extend_schema(
+        responses={
+            status.HTTP_404_NOT_FOUND: OpenApiTypes.OBJECT,
+            status.HTTP_200_OK: ContactGroupSerializer,
+        },
+        examples=[
+            NOT_FOUND_RESPONSE,
+            CONTACT_GROUP_RESPONSE,
+        ],
+    ),
+    delete=extend_schema(
+        responses={
+            status.HTTP_404_NOT_FOUND: OpenApiTypes.OBJECT,
+            status.HTTP_204_NO_CONTENT: None,
+        },
+        examples=[
+            NOT_FOUND_RESPONSE,
+        ],
+    ),
+)
 class ContactGroupDetailView(RetrieveDestroyAPIView):
     """View for retrieving/deleting a particular contact group by its UUID."""
 
@@ -40,6 +100,18 @@ class ContactGroupDetailView(RetrieveDestroyAPIView):
     lookup_field = "uuid"
 
 
+@extend_schema_view(
+    get=extend_schema(
+        examples=[
+            CONTACT_GROUP_RESPONSE,
+        ],
+    ),
+    post=extend_schema(
+        examples=[
+            CONTACT_GROUP_RESPONSE,
+        ],
+    )
+)
 class ContactGroupListView(ListCreateAPIView):
     """View for listing contact groups/creating a contact group."""
 
@@ -51,6 +123,18 @@ class ContactGroupListView(ListCreateAPIView):
         return ContactGroup.objects.filter(user=user).prefetch_related("contacts")
 
 
+@extend_schema_view(
+    delete=extend_schema(
+        responses={
+            status.HTTP_404_NOT_FOUND: OpenApiTypes.OBJECT,
+            status.HTTP_204_NO_CONTENT: None,
+        },
+        examples=[
+            CONTACT_NOT_FOUND_RESPONSE,
+            CONTACT_GROUP_NOT_FOUND_RESPONSE,
+        ],
+    ),
+)
 class ContactGroupRemoveContactView(APIView):
     """View for removing a contact from contact group by its UUID."""
     def delete(self, request: Request, contact_group_uuid: UUID, contact_uuid: UUID) -> Response:
@@ -76,10 +160,35 @@ class ContactGroupRemoveContactView(APIView):
         return Response("", status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema_view(
+    get=extend_schema(
+        responses={
+            status.HTTP_404_NOT_FOUND: OpenApiTypes.OBJECT,
+            status.HTTP_200_OK: ContactSerializer,
+        },
+        examples=[
+            NOT_FOUND_RESPONSE,
+            CONTACT_RESPONSE,
+        ],
+    ),
+    post=extend_schema(
+        request=inline_serializer(name="Contact UUID", fields={"uuid": UUIDField()}),
+        responses={
+            status.HTTP_404_NOT_FOUND: OpenApiTypes.OBJECT,
+            status.HTTP_200_OK: ContactSerializer,
+            status.HTTP_303_SEE_OTHER: OpenApiTypes.OBJECT,
+        },
+        examples=[
+            CONTACT_NOT_FOUND_RESPONSE,
+            CONTACT_GROUP_NOT_FOUND_RESPONSE,
+            CONTACT_RESPONSE,
+        ],
+    ),
+)
 class ContactGroupAddListContactsView(ListCreateAPIView):
     """View for adding existing contact to a group and listing all contacts within the group."""
 
-    serializer_class = ContactGroupContactSerializer
+    serializer_class = ContactSerializer
 
     def get_queryset(self) -> QuerySet[Contact]:
         """
@@ -110,16 +219,20 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
         try:
             contact: Contact = Contact.objects.get(uuid=contact_uuid)
         except Contact.DoesNotExist:
-            return Response(f"Contact with UUID '{contact_uuid}' does not exist", status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": f"Contact with UUID '{contact_uuid}' does not exist."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         try:
             contact_group: ContactGroup = ContactGroup.objects.get(uuid=contact_group_uuid)
         except ContactGroup.DoesNotExist:
             return Response(
-                f"ContactGroup with UUID '{contact_group_uuid}' does not exist", status=status.HTTP_404_NOT_FOUND,
+                {"detail": f"ContactGroup with UUID '{contact_group_uuid}' does not exist."},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = ContactGroupContactSerializer(contact, context={"request": request})
+        serializer = ContactSerializer(contact, context={"request": request})
 
         if contact in contact_group.contacts.all():
             return Response(serializer.data, status=status.HTTP_303_SEE_OTHER)
@@ -132,6 +245,9 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
     get=extend_schema(
         parameters=[
             OpenApiParameter(name="name", location=OpenApiParameter.QUERY, description="Name of the contact group"),
+        ],
+        examples=[
+            CONTACT_GROUP_RESPONSE,
         ],
     )
 )

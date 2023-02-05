@@ -35,17 +35,3 @@ class ContactGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactGroup
         fields = ("name", "contacts", "user", "uuid",)
-
-
-class ContactGroupContactSerializer(ContactSerializer):
-    """
-    Serializer class for contacts within contact groups; used for correct automatic schema generation.
-
-    Similar to `ContactSerializer`, but all fields are read-only, except for the write-only UUID field.
-    """
-
-    uuid = serializers.UUIDField(write_only=True)
-    contact_groups = serializers.SlugRelatedField(slug_field="uuid", many=True, read_only=True)
-
-    class Meta(ContactSerializer.Meta):
-        read_only_fields = ("first_name", "last_name", "email", "phone_number",)
