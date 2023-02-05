@@ -51,7 +51,7 @@ class ContactGroupListView(ListCreateAPIView):
         return ContactGroup.objects.filter(user=user).prefetch_related("contacts")
 
 
-class ContactGroupContactDetailView(APIView):
+class ContactGroupRemoveContactView(APIView):
     """View for removing a contact from contact group by its UUID."""
     def delete(self, request: Request, contact_group_uuid: UUID, contact_uuid: UUID) -> Response:
         """
@@ -76,7 +76,7 @@ class ContactGroupContactDetailView(APIView):
         return Response("", status=status.HTTP_204_NO_CONTENT)
 
 
-class ContactGroupContactListView(ListCreateAPIView):
+class ContactGroupAddListContactsView(ListCreateAPIView):
     """View for adding existing contact to a group and listing all contacts within the group."""
 
     serializer_class = ContactGroupContactSerializer
