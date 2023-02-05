@@ -10,7 +10,7 @@ class TestUserViewSet:
         request = rf.get("/fake-url/")
         request.user = user
 
-        view.request = request
+        view.request = request  # type: ignore
 
         assert user in view.get_queryset()
 
@@ -19,9 +19,9 @@ class TestUserViewSet:
         request = rf.get("/fake-url/")
         request.user = user
 
-        view.request = request
+        view.request = request  # type: ignore
 
-        response = view.me(request)
+        response = view.me(request)  # type: ignore
 
         assert response.data == {
             "username": user.username,

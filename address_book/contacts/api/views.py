@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from django.db.models import QuerySet
@@ -68,7 +69,7 @@ class ContactListView(ListCreateAPIView):
     def get_queryset(self) -> QuerySet[Contact]:
         """Filter contacts on the current user and prefetch related `contact_groups` to avoid N+1 problem."""
         user = self.request.user
-        return Contact.objects.filter(user=user).prefetch_related("contact_groups")
+        return Contact.objects.filter(user=user).prefetch_related("contact_groups")  # type: ignore
 
 
 @extend_schema_view(
@@ -120,7 +121,7 @@ class ContactGroupListView(ListCreateAPIView):
     def get_queryset(self) -> QuerySet[ContactGroup]:
         """Filter contact groups on the current user and prefetch related `contacts` to avoid N+1 problem."""
         user = self.request.user
-        return ContactGroup.objects.filter(user=user).prefetch_related("contacts")
+        return ContactGroup.objects.filter(user=user).prefetch_related("contacts")  # type: ignore
 
 
 @extend_schema_view(
@@ -198,16 +199,16 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
         :raise Http404: if there is no contact group with given UUID
         """
         user = self.request.user
-        contact_group_uuid = self.kwargs["contact_group_uuid"]
+        contact_group_uuid: UUID = self.kwargs["contact_group_uuid"]
 
         try:
-            contact_group: ContactGroup = ContactGroup.objects.get(user=user, uuid=contact_group_uuid)
+            contact_group: ContactGroup = ContactGroup.objects.get(user=user, uuid=contact_group_uuid)  # type: ignore
         except ContactGroup.DoesNotExist as error:
             raise Http404(f"ContactGroup with UUID '{contact_group_uuid}' does not exist") from error
 
         return contact_group.contacts.prefetch_related("contact_groups")
 
-    def create(self, request: Request, contact_group_uuid: UUID) -> Response:
+    def create(self, request: Request,  *args: Any, **kwargs: Any) -> Response:
         """
         Add an existing contact to the contact group.
 
@@ -224,6 +225,7 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        contact_group_uuid: UUID = self.kwargs["contact_group_uuid"]
         try:
             contact_group: ContactGroup = ContactGroup.objects.get(uuid=contact_group_uuid)
         except ContactGroup.DoesNotExist:
@@ -264,4 +266,6 @@ class ContactGroupSearch(ListAPIView):
         """
         user = self.request.user
         name_query = self.request.query_params.get("name", "")
-        return ContactGroup.objects.filter(user=user, name__icontains=name_query).prefetch_related("contacts")
+        return ContactGroup.objects.filter(
+            user=user, name__icontains=name_query,
+        ).prefetch_related("contacts")  # type: ignore
