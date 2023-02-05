@@ -1,4 +1,3 @@
-import pytest
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import AnonymousUser
@@ -8,14 +7,12 @@ from django.http import HttpRequest, HttpResponseRedirect
 from django.test import RequestFactory
 from django.urls import reverse
 
+import pytest
+
 from address_book.users.forms import UserAdminChangeForm
 from address_book.users.models import User
 from address_book.users.tests.factories import UserFactory
-from address_book.users.views import (
-    UserRedirectView,
-    UserUpdateView,
-    user_detail_view,
-)
+from address_book.users.views import UserRedirectView, UserUpdateView, user_detail_view
 
 pytestmark = pytest.mark.django_db
 

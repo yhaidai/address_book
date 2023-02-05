@@ -1,8 +1,13 @@
 from django.urls import path
 
 from address_book.contacts.api.views import (
-    ContactDetailView, ContactListView, ContactGroupDetailView, ContactGroupListView, ContactGroupAddListContactsView,
-    ContactGroupRemoveContactView, ContactGroupSearch,
+    ContactDetailView,
+    ContactGroupAddListContactsView,
+    ContactGroupDetailView,
+    ContactGroupListView,
+    ContactGroupRemoveContactView,
+    ContactGroupSearch,
+    ContactListView,
 )
 
 urlpatterns = [

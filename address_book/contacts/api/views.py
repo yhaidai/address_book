@@ -3,21 +3,34 @@ from uuid import UUID
 
 from django.db.models import QuerySet
 from django.http import Http404
+
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view, inline_serializer
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    extend_schema,
+    extend_schema_view,
+    inline_serializer,
+)
 from rest_framework import status
 from rest_framework.fields import UUIDField
-from rest_framework.generics import RetrieveDestroyAPIView, ListCreateAPIView, ListAPIView
+from rest_framework.generics import (
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveDestroyAPIView,
+)
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .schema_utils import (
-    NOT_FOUND_RESPONSE, CONTACT_RESPONSE, CONTACT_GROUP_RESPONSE, CONTACT_NOT_FOUND_RESPONSE,
-    CONTACT_GROUP_NOT_FOUND_RESPONSE,
-)
-from .serializers import ContactSerializer, ContactGroupSerializer
 from ..models import Contact, ContactGroup
+from .schema_utils import (
+    CONTACT_GROUP_NOT_FOUND_RESPONSE,
+    CONTACT_GROUP_RESPONSE,
+    CONTACT_NOT_FOUND_RESPONSE,
+    CONTACT_RESPONSE,
+    NOT_FOUND_RESPONSE,
+)
+from .serializers import ContactGroupSerializer, ContactSerializer
 
 
 @extend_schema_view(
