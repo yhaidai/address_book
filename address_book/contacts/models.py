@@ -22,10 +22,10 @@ class Contact(UUIDModel):
     """Contacts have many-to-one relationship with users and many-to-many with contact groups."""
 
     user = models.ForeignKey(User, on_delete=CASCADE, related_name="contacts", related_query_name="contact")
-    first_name = models.CharField(max_length=63)
-    last_name = models.CharField(max_length=63)
-    email = models.EmailField(max_length=255)
-    phone_number = PhoneNumberField(max_length=15)
+    first_name = models.CharField(max_length=63, default="")
+    last_name = models.CharField(max_length=63, default="")
+    email = models.EmailField(max_length=255, default="")
+    phone_number = PhoneNumberField(max_length=15, default="")
 
 
 class ContactGroup(UUIDModel):
