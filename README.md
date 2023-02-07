@@ -7,6 +7,14 @@ Simple address book application. Users have their contacts and contact groups. A
 
 License: MIT
 
+## Running Locally
+
+### On Docker
+1. Install and launch [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+2. Run: `docker compose --file local.yml up`
+3. Visit http://127.0.0.1:8000/ to create a user (API prevents unauthorized access)
+4. SwaggerUI for the API is available at http://127.0.0.1:8000/api/docs/
+
 ## Settings
 
 Moved to [settings](http://cookiecutter-django.readthedocs.io/en/latest/settings.html).
@@ -29,6 +37,31 @@ Running type checks with mypy:
 
     $ mypy address_book
 
+#### On Docker
+
+    $ docker compose --file local.yml run --rm django mypy address_book
+
+### Linters
+
+Running style checks with flake:
+
+    $ flake8 address_book
+
+#### On Docker
+
+    $ docker compose --file local.yml run --rm django flake8 address_book
+
+### Formatters
+
+Sorting imports with isort:
+
+    $ isort address_book
+
+#### On Docker
+
+    $ docker compose --file local.yml run --rm django isort address_book
+
+
 ### Test coverage
 
 To run the tests, check your test coverage, and generate an HTML coverage report:
@@ -41,14 +74,9 @@ To run the tests, check your test coverage, and generate an HTML coverage report
 
     $ pytest
 
-### Live reloading and Sass CSS compilation
+#### On Docker
 
-Moved to [Live reloading and SASS compilation](https://cookiecutter-django.readthedocs.io/en/latest/developing-locally.html#sass-compilation-live-reloading).
-
-## Deployment
-
-The following details how to deploy this application.
-
-### Docker
-
-See detailed [cookiecutter-django Docker documentation](http://cookiecutter-django.readthedocs.io/en/latest/deployment-with-docker.html).
+    $ docker compose --file local.yml run --rm django coverage run -m pytest
+    $ docker compose --file local.yml run --rm django coverage html
+    $ docker compose --file local.yml run --rm django open htmlcov/index.html
+    $ docker compose --file local.yml run --rm django pytest
