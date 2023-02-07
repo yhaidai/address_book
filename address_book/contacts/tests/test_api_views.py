@@ -1,16 +1,18 @@
 from collections import OrderedDict
 from itertools import chain, combinations
-from typing import Callable, TypeAlias, Iterable, TypeVar, Any, Mapping
+from typing import Any, Callable, Iterable, TypeAlias, TypeVar
 from uuid import UUID, uuid4
 
-import pytest
-from django.contrib.auth import get_user_model
 from django.db.models import QuerySet
+
+import pytest
+from mypy_extensions import KwArg, DefaultArg
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APIClient
 
 from address_book.contacts.models import Contact, ContactGroup
+from address_book.users.models import User
 
 CONTACT_LIST_ENDPOINT = "/api/contacts/"
 CONTACT_DETAIL_ENDPOINT = "/api/contacts/{uuid}"
@@ -20,16 +22,20 @@ CONTACT_GROUPS_ENDPOINT = "/api/contact_groups/"
 T = TypeVar("T")
 GET_NON_EXISTENT_UUID_RETURN_TYPE: TypeAlias = Callable[[QuerySet[Any]], UUID]
 POSTED_CONTACT: TypeAlias = dict[str, str | list[str]]
-CONTACT_POST_DATA_FACTORY_RETURN_TYPE: TypeAlias = Callable[[Iterable[str] | None, ...], POSTED_CONTACT]
+CONTACT_POST_DATA_FACTORY_RETURN_TYPE: TypeAlias = Callable[
+    [
+        DefaultArg(Iterable[str] | None),
+        KwArg(Any),
+    ],
+    POSTED_CONTACT
+]
 SERIALIZED_CONTACT: TypeAlias = OrderedDict[str, str | list[UUID]]
 SERIALIZE_CONTACT_RETURN_TYPE: TypeAlias = Callable[[Contact], SERIALIZED_CONTACT]
 
 pytestmark = pytest.mark.django_db
 
-User = get_user_model()
 
-
-def powerset(iterable: Iterable[T]) -> chain[tuple[T]]:
+def powerset(iterable: Iterable[T]) -> chain[tuple[T, ...]]:
     """powerset([1, 2, 3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"""
     s = list(iterable)
     return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
@@ -192,7 +198,8 @@ def serialize_contact() -> SERIALIZE_CONTACT_RETURN_TYPE:
 
 @pytest.fixture(scope="module")
 def api_client() -> APIClient:
-    return APIClient()
+    api_client = APIClient()
+    return api_client
 
 
 class TestContactListView:
@@ -212,12 +219,12 @@ class TestContactListView:
         """Return sample data for a 'POST /api/contacts' request, based on the given fields."""
 
         def _contact_post_data(exclude: Iterable[str] | None = None, **kwargs: Any) -> POSTED_CONTACT:
-            data = dict(
+            data: POSTED_CONTACT = dict(
                 first_name="fn",
                 last_name="ln",
                 email="fnln@test.com",
                 phone_number="+31682772975",
-                contact_groups=[str(contact_group_1.uuid)]
+                contact_groups=[str(contact_group_1.uuid)],
             )
             data.update(kwargs)
 
@@ -358,7 +365,7 @@ class TestContactListView:
         response = self._api_client.post(CONTACT_LIST_ENDPOINT, data=data)
 
         assert response.status_code == status.HTTP_201_CREATED
-        response_data: SERIALIZED_CONTACT = response.data  # type: ignore
+        response_data: SERIALIZED_CONTACT = response.data
         self._assert_post_data_matches_response_data(data, response_data)
         self._assert_post_response_data_is_saved_correctly(response_data, user)
 
@@ -383,21 +390,22 @@ class TestContactListView:
     def _assert_post_data_matches_response_data(data: POSTED_CONTACT, response_data: SERIALIZED_CONTACT) -> None:
         """Check that data in the POST request to /api/contacts/ matches the data returned in response"""
         assert "uuid" in response_data
-        data["contact_groups"] = [UUID(uuid_str) for uuid_str in data.get("contact_groups", [])]
+        data["contact_groups"] = [UUID(uuid_str) for uuid_str in data.get("contact_groups", [])]  # type: ignore
         for field, value in data.items():
             assert value == response_data[field]
 
     def _assert_post_response_data_is_saved_correctly(
         self,
         post_response_data: SERIALIZED_CONTACT,
-        expected_user: User,
+        expected_user: User | None,
     ) -> None:
         """
         Check that the data returned in response to 'POST /api/contacts/' has been saved to the database correctly.
 
         :param expected_user: `User` instance under which the contact data was POSTed - to check it is saved to the DB
         """
-        created_contact = Contact.objects.get(uuid=post_response_data["uuid"])
+        uuid = UUID(post_response_data["uuid"])  # type: ignore
+        created_contact = Contact.objects.get(uuid=uuid)
         contact_expected_api_repr = self._contact_serializer(created_contact)
         assert contact_expected_api_repr == post_response_data
         assert created_contact.user == expected_user
@@ -453,7 +461,7 @@ class TestContactDetailView:
     def test_delete_is_not_accessible_by_anonymous_users(self, contact_1: Contact):
         self._api_client.force_authenticate(user=None)
         endpoint = CONTACT_DETAIL_ENDPOINT.format(uuid=str(contact_1.uuid))
-        response: Response = self._api_client.delete(endpoint)  # type: ignore
+        response: Response = self._api_client.delete(endpoint)
         print(type(response))
         assert response.status_code == status.HTTP_403_FORBIDDEN
 

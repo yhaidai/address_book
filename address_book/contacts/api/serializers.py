@@ -1,7 +1,10 @@
 from rest_framework import serializers
 
-from .validators import NonEmptyTogetherValidator, ContactGroupsBelongToContactCreatorValidator
 from ..models import Contact, ContactGroup
+from .validators import (
+    ContactGroupsBelongToContactCreatorValidator,
+    NonEmptyTogetherValidator,
+)
 
 
 class ContactSerializer(serializers.ModelSerializer):

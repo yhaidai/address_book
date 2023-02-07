@@ -1,13 +1,11 @@
 from typing import Iterable
 
-from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 from rest_framework.exceptions import ValidationError
 
 from address_book.contacts.models import ContactGroup
-
-User = get_user_model()
+from address_book.users.models import User
 
 
 class NonEmptyTogetherValidator:
@@ -37,5 +35,4 @@ class ContactGroupsBelongToContactCreatorValidator:
         contact_groups: list[ContactGroup] = attrs["contact_groups"]
 
         if any(contact_group.user != expected_user for contact_group in contact_groups):
-            raise ValidationError(self._message)
-
+            raise ValidationError(str(self._message))
