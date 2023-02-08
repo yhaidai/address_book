@@ -12,7 +12,7 @@ NOT_FOUND_RESPONSE = OpenApiExample(
 
 CONTACT_NOT_FOUND_RESPONSE = OpenApiExample(
     "Contact Not Found",
-    value={"detail": f"Contact with UUID '{uuid.uuid4()}' does not exist."},
+    value={"detail": f"Contact with UUID '{uuid.uuid4()}' does not exist for your user."},
 
     response_only=True,
     status_codes=[status.HTTP_404_NOT_FOUND],
@@ -20,7 +20,7 @@ CONTACT_NOT_FOUND_RESPONSE = OpenApiExample(
 
 CONTACT_GROUP_NOT_FOUND_RESPONSE = OpenApiExample(
     "Contact Group Not Found",
-    value={"detail": f"ContactGroup with UUID '{uuid.uuid4()}' does not exist."},
+    value={"detail": f"ContactGroup with UUID '{uuid.uuid4()}' does not exist for your user."},
     response_only=True,
     status_codes=[status.HTTP_404_NOT_FOUND],
 )

@@ -222,7 +222,7 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
         try:
             contact_group: ContactGroup = ContactGroup.objects.get(user=user, uuid=contact_group_uuid)  # type: ignore
         except ContactGroup.DoesNotExist as error:
-            raise Http404(f"ContactGroup with UUID '{contact_group_uuid}' does not exist") from error
+            raise Http404(f"ContactGroup with UUID '{contact_group_uuid}' does not exist for your user.") from error
 
         return contact_group.contacts.prefetch_related("contact_groups")
 
@@ -239,7 +239,7 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
             contact: Contact = Contact.objects.get(uuid=contact_uuid)
         except Contact.DoesNotExist:
             return Response(
-                {"detail": f"Contact with UUID '{contact_uuid}' does not exist."},
+                {"detail": f"Contact with UUID '{contact_uuid}' does not exist for your user."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -248,7 +248,7 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
             contact_group: ContactGroup = ContactGroup.objects.get(uuid=contact_group_uuid)
         except ContactGroup.DoesNotExist:
             return Response(
-                {"detail": f"ContactGroup with UUID '{contact_group_uuid}' does not exist."},
+                {"detail": f"ContactGroup with UUID '{contact_group_uuid}' does not exist for your user."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
