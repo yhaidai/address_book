@@ -211,7 +211,7 @@ class TestContactListView:
 
     @pytest.fixture
     def contact_post_data_factory(self, contact_group_1) -> CONTACT_POST_DATA_FACTORY_RETURN_TYPE:
-        """Return sample data for a 'POST /api/contacts' request, based on the given fields."""
+        """Return sample data for a 'POST /api/contacts/' request, based on the given fields."""
 
         def _contact_post_data(exclude: Iterable[str] | None = None, **kwargs: Any) -> POSTED_CONTACT:
             data: POSTED_CONTACT = dict(
@@ -237,7 +237,7 @@ class TestContactListView:
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     def test_get_for_authenticated_user(self, user_1: User):
-        """Test that 'GET /api/contacts' responds with 200 OK and a list of contacts for the authenticated user."""
+        """Test that 'GET /api/contacts/' responds with 200 OK and a list of contacts for the authenticated user."""
         api_client.force_authenticate(user=user_1)
         response: Response = api_client.get(CONTACT_LIST_ENDPOINT)
 
@@ -269,7 +269,7 @@ class TestContactListView:
         exclude: tuple[str],
     ):
         """
-        Check that 'POST /api/contacts' with a valid data responds with 201 CREATED and an accordingly serialized
+        Check that 'POST /api/contacts/' with a valid data responds with 201 CREATED and an accordingly serialized
         newly created contact instance.
         """
         data = contact_post_data_factory(exclude=exclude)
@@ -287,7 +287,7 @@ class TestContactListView:
         user_1: User,
         exclude: tuple[str],
     ):
-        """Check that 'POST /api/contacts' with an insufficient data responds with 400 BAD REQUEST."""
+        """Check that 'POST /api/contacts/' with an insufficient data responds with 400 BAD REQUEST."""
         data = contact_post_data_factory(exclude=exclude)
         self._assert_post_response_is_bad_request(data=data, user=user_1)
 
@@ -304,7 +304,7 @@ class TestContactListView:
         user_1: User,
         contact_post_data_factory_kwargs: POSTED_CONTACT,
     ):
-        """Check that 'POST /api/contacts' with an invalid data responds with 400 BAD REQUEST."""
+        """Check that 'POST /api/contacts/' with an invalid data responds with 400 BAD REQUEST."""
         data = contact_post_data_factory(**contact_post_data_factory_kwargs)
         self._assert_post_response_is_bad_request(data=data, user=user_1)
 
@@ -346,7 +346,7 @@ class TestContactListView:
         user: User | None = None,
     ) -> None:
         """
-        Check that 'POST /api/contacts' responds with 201 CREATED and an accordingly serialized newly created contact
+        Check that 'POST /api/contacts/' responds with 201 CREATED and an accordingly serialized newly created contact
         instance.
 
         :param data: Data to be sent with the POST request
@@ -366,7 +366,7 @@ class TestContactListView:
         user: User | None = None,
     ) -> None:
         """
-        Check that 'POST /api/contacts' responds with 400 BAD REQUEST.
+        Check that 'POST /api/contacts/' responds with 400 BAD REQUEST.
 
         :param data: Data to be sent with the POST request
         :param user: `User` instance to authenticate under
@@ -488,7 +488,7 @@ class TestContactGroupListView:
 
     def test_get_for_authenticated_user(self, user_1: User):
         """
-        Test that 'GET /api/contact_groups' responds with 200 OK and a list of contacts for the authenticated user.
+        Test that 'GET /api/contact_groups/' responds with 200 OK and a list of contacts for the authenticated user.
         """
         api_client.force_authenticate(user=user_1)
         response: Response = api_client.get(CONTACT_GROUP_LIST_ENDPOINT)
@@ -517,7 +517,7 @@ class TestContactGroupListView:
         exclude: tuple[str],
     ):
         """
-        Check that 'POST /api/contact_groups' with a valid data responds with 201 CREATED and an accordingly serialized
+        Check that 'POST /api/contact_groups/' with a valid data responds with 201 CREATED and an accordingly serialized
         newly created contact instance.
         """
         data = contact_group_post_data_factory(exclude=exclude)
@@ -534,7 +534,7 @@ class TestContactGroupListView:
         user_1: User,
         exclude: tuple[str],
     ):
-        """Check that 'POST /api/contact_groups' with an insufficient data responds with 400 BAD REQUEST."""
+        """Check that 'POST /api/contact_groups/' with an insufficient data responds with 400 BAD REQUEST."""
         data = contact_group_post_data_factory(exclude=exclude)
         self._assert_post_response_is_bad_request(data=data, user=user_1)
 
@@ -550,7 +550,7 @@ class TestContactGroupListView:
         user_1: User,
         contact_group_post_data_factory_kwargs: POSTED_CONTACT_GROUP,
     ):
-        """Check that 'POST /api/contact_groups' with an invalid data responds with 400 BAD REQUEST."""
+        """Check that 'POST /api/contact_groups/' with an invalid data responds with 400 BAD REQUEST."""
         data = contact_group_post_data_factory(**contact_group_post_data_factory_kwargs)
         self._assert_post_response_is_bad_request(data=data, user=user_1)
 
@@ -612,7 +612,7 @@ class TestContactGroupListView:
         user: User | None = None,
     ) -> None:
         """
-        Check that 'POST /api/contacts' responds with 400 BAD REQUEST.
+        Check that 'POST /api/contact_groups/' responds with 400 BAD REQUEST.
 
         :param data: Data to be sent with the POST request
         :param user: `User` instance to authenticate under
@@ -678,7 +678,9 @@ class TestContactGroupDetailView:
         assert expected_contact_data == response.data
 
     def test_get_invalid_uuid_for_authenticated_user(self, non_existent_contact_group_uuid: UUID, user_1: User):
-        """Test that 'GET /api/contacts/<invalid_uuid>/' responds with 404 NOT FOUND for the authenticated user."""
+        """
+        Test that 'GET /api/contact_groups/<invalid_uuid>/' responds with 404 NOT FOUND for the authenticated user.
+        """
         api_client.force_authenticate(user=user_1)
         endpoint = CONTACT_GROUP_DETAIL_ENDPOINT.format(uuid=non_existent_contact_group_uuid)
         response: Response = api_client.get(endpoint)
