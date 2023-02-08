@@ -3,6 +3,7 @@ from rest_framework import serializers
 from ..models import Contact, ContactGroup
 from .validators import (
     ContactGroupsBelongToContactCreatorValidator,
+    ContactsBelongToContactGroupCreatorValidator,
     NonEmptyTogetherValidator,
 )
 
@@ -44,3 +45,6 @@ class ContactGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactGroup
         fields = ("name", "contacts", "user", "uuid",)
+        validators = [
+            ContactsBelongToContactGroupCreatorValidator(),
+        ]

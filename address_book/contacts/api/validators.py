@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 
 from rest_framework.exceptions import ValidationError
 
-from address_book.contacts.models import ContactGroup
+from address_book.contacts.models import Contact, ContactGroup
 from address_book.users.models import User
 
 
@@ -35,4 +35,20 @@ class ContactGroupsBelongToContactCreatorValidator:
         contact_groups: list[ContactGroup] = attrs["contact_groups"]
 
         if any(contact_group.user != expected_user for contact_group in contact_groups):
+            raise ValidationError(str(self._message))
+
+
+class ContactsBelongToContactGroupCreatorValidator:
+    """Validate that all contacts belong to the same user that the contact group belongs to."""
+
+    _MESSAGE = _("Provided contact UUID(s) do not exist for your user.")
+
+    def __init__(self, message=None):
+        self._message = message or self._MESSAGE
+
+    def __call__(self, attrs):
+        expected_user: User = attrs["user"]
+        contacts: list[Contact] = attrs["contacts"]
+
+        if any(contact.user != expected_user for contact in contacts):
             raise ValidationError(str(self._message))
