@@ -161,13 +161,17 @@ class ContactGroupRemoveContactView(APIView):
         try:
             contact: Contact = Contact.objects.get(uuid=contact_uuid)
         except Contact.DoesNotExist:
-            return Response(f"Contact with UUID '{contact_uuid}' does not exist", status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": f"Contact with UUID '{contact_uuid}' does not exist"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         try:
             contact_group: ContactGroup = ContactGroup.objects.get(uuid=contact_group_uuid)
         except ContactGroup.DoesNotExist:
             return Response(
-                f"ContactGroup with UUID '{contact_group_uuid}' does not exist", status=status.HTTP_404_NOT_FOUND,
+                {"detail": f"ContactGroup with UUID '{contact_group_uuid}' does not exist"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         contact_group.contacts.remove(contact)
