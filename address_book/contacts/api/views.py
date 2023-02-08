@@ -13,16 +13,13 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework.fields import UUIDField
-from rest_framework.generics import (
-    ListAPIView,
-    ListCreateAPIView,
-    RetrieveDestroyAPIView,
-)
+from rest_framework.generics import GenericAPIView, ListAPIView, ListCreateAPIView
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..models import Contact, ContactGroup
+from .mixins import CreateViewMixin, DestroyViewMixin, ListViewMixin, RetrieveViewMixin
 from .schema_utils import (
     CONTACT_GROUP_NOT_FOUND_RESPONSE,
     CONTACT_GROUP_RESPONSE,
@@ -31,6 +28,26 @@ from .schema_utils import (
     NOT_FOUND_RESPONSE,
 )
 from .serializers import ContactGroupSerializer, ContactSerializer
+
+
+class ContactView(GenericAPIView):
+
+    serializer_class = ContactSerializer
+
+    def get_queryset(self) -> QuerySet[Contact]:
+        """Filter contacts on the current user and prefetch related `contact_groups` to avoid N+1 problem."""
+        user = self.request.user
+        return Contact.objects.filter(user=user).prefetch_related("contact_groups")  # type: ignore
+
+
+class ContactGroupView(GenericAPIView):
+
+    serializer_class = ContactGroupSerializer
+
+    def get_queryset(self) -> QuerySet[ContactGroup]:
+        """Filter contact groups on the current user and prefetch related `contacts` to avoid N+1 problem."""
+        user = self.request.user
+        return ContactGroup.objects.filter(user=user).prefetch_related("contacts")  # type: ignore
 
 
 @extend_schema_view(
@@ -54,11 +71,9 @@ from .serializers import ContactGroupSerializer, ContactSerializer
         ],
     ),
 )
-class ContactDetailView(RetrieveDestroyAPIView):
+class ContactDetailView(ContactView, RetrieveViewMixin, DestroyViewMixin):
     """View for retrieving/deleting a particular contact by its UUID."""
 
-    queryset = Contact.objects.all()
-    serializer_class = ContactSerializer
     lookup_field = "uuid"
 
 
@@ -74,15 +89,8 @@ class ContactDetailView(RetrieveDestroyAPIView):
         ],
     )
 )
-class ContactListView(ListCreateAPIView):
+class ContactListView(ContactView, ListViewMixin, CreateViewMixin):
     """View for listing contacts/creating a contact."""
-
-    serializer_class = ContactSerializer
-
-    def get_queryset(self) -> QuerySet[Contact]:
-        """Filter contacts on the current user and prefetch related `contact_groups` to avoid N+1 problem."""
-        user = self.request.user
-        return Contact.objects.filter(user=user).prefetch_related("contact_groups")  # type: ignore
 
 
 @extend_schema_view(
@@ -106,11 +114,9 @@ class ContactListView(ListCreateAPIView):
         ],
     ),
 )
-class ContactGroupDetailView(RetrieveDestroyAPIView):
+class ContactGroupDetailView(ContactGroupView, RetrieveViewMixin, DestroyViewMixin):
     """View for retrieving/deleting a particular contact group by its UUID."""
 
-    queryset = ContactGroup.objects.all()
-    serializer_class = ContactGroupSerializer
     lookup_field = "uuid"
 
 
@@ -126,15 +132,8 @@ class ContactGroupDetailView(RetrieveDestroyAPIView):
         ],
     )
 )
-class ContactGroupListView(ListCreateAPIView):
+class ContactGroupListView(ContactGroupView, ListViewMixin, CreateViewMixin):
     """View for listing contact groups/creating a contact group."""
-
-    serializer_class = ContactGroupSerializer
-
-    def get_queryset(self) -> QuerySet[ContactGroup]:
-        """Filter contact groups on the current user and prefetch related `contacts` to avoid N+1 problem."""
-        user = self.request.user
-        return ContactGroup.objects.filter(user=user).prefetch_related("contacts")  # type: ignore
 
 
 @extend_schema_view(
@@ -158,19 +157,21 @@ class ContactGroupRemoveContactView(APIView):
         :return: 404 NOT FOUND, error msg - if there is no contact/group with given UUID.
                  204 NO CONTENT - if the contact has been successfully removed from the group.
         """
+        user = self.request.user
+
         try:
-            contact: Contact = Contact.objects.get(uuid=contact_uuid)
+            contact: Contact = Contact.objects.get(uuid=contact_uuid, user=user)  # type: ignore
         except Contact.DoesNotExist:
             return Response(
-                {"detail": f"Contact with UUID '{contact_uuid}' does not exist"},
+                {"detail": f"Contact with UUID '{contact_uuid}' does not exist for your user."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         try:
-            contact_group: ContactGroup = ContactGroup.objects.get(uuid=contact_group_uuid)
+            contact_group: ContactGroup = ContactGroup.objects.get(uuid=contact_group_uuid, user=user)  # type: ignore
         except ContactGroup.DoesNotExist:
             return Response(
-                {"detail": f"ContactGroup with UUID '{contact_group_uuid}' does not exist"},
+                {"detail": f"ContactGroup with UUID '{contact_group_uuid}' does not exist for your user."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
