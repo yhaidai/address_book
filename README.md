@@ -67,6 +67,7 @@ Sorting imports with isort:
 To run the tests, check your test coverage, and generate an HTML coverage report:
 
     $ coverage run -m pytest
+    $ coverage report
     $ coverage html
     $ open htmlcov/index.html
 
@@ -76,7 +77,6 @@ To run the tests, check your test coverage, and generate an HTML coverage report
 
 #### On Docker
 
-    $ docker compose --file local.yml run --rm django coverage run -m pytest
+    $ docker compose --file local.yml run --rm django bash -c "coverage run -m pytest && coverage report"
     $ docker compose --file local.yml run --rm django coverage html
-    $ docker compose --file local.yml run --rm django open htmlcov/index.html
     $ docker compose --file local.yml run --rm django pytest
