@@ -6,7 +6,7 @@ from address_book.contacts.api.views import (
     ContactGroupDetailView,
     ContactGroupListView,
     ContactGroupRemoveContactView,
-    ContactGroupSearch,
+    ContactGroupSearchView,
     ContactListView,
 )
 
@@ -18,12 +18,12 @@ urlpatterns = [
     path(
         "contact_groups/<uuid:contact_group_uuid>/contacts/",
         ContactGroupAddListContactsView.as_view(),
-        name="contact_group_add_list_contacts",
+        name="contact_group_contact_list",
     ),
     path(
         "contact_groups/<uuid:contact_group_uuid>/contacts/<uuid:contact_uuid>/",
         ContactGroupRemoveContactView.as_view(),
-        name="contact_group_remove_contact",
+        name="contact_group_contact_detail",
     ),
-    path("contact_groups/search/", ContactGroupSearch.as_view(), name="contact_group_search")
+    path("contact_groups/search/", ContactGroupSearchView.as_view(), name="contact_group_search")
 ]

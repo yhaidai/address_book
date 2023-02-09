@@ -273,7 +273,7 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
         ],
     )
 )
-class ContactGroupSearch(ListAPIView):
+class ContactGroupSearchView(ListAPIView):
     """View for searching contact groups by name."""
 
     serializer_class = ContactGroupSerializer
