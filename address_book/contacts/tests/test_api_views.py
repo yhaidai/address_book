@@ -63,6 +63,7 @@ def user_1() -> User:
 
 @pytest.fixture
 def user_2() -> User:
+    """User that has contact 5, and contact group 3."""
     return User.objects.create(
         name="Test User 2",
         username="test_username_2",
@@ -119,6 +120,18 @@ def contact_4(user_1: User) -> Contact:
 
 
 @pytest.fixture
+def contact_5(user_2: User) -> Contact:
+    """Contact of `user_2`, belongs to `contact_group_3`."""
+    return Contact.objects.create(
+        first_name="first name 5",
+        last_name="last name 5",
+        email="contact_5@test.com",
+        phone_number="+31555555555",
+        user=user_2,
+    )
+
+
+@pytest.fixture
 def contact_group_1(user_1: User, contact_1: Contact, contact_2: Contact) -> ContactGroup:
     """Contact group of `user_1`, contains `contact_1`, `contact_2`."""
     contact_group = ContactGroup.objects.create(
@@ -146,8 +159,25 @@ def contact_group_2(user_1: User, contact_1: Contact, contact_3: Contact) -> Con
     return contact_group
 
 
+@pytest.fixture
+def contact_group_3(user_2: User, contact_5: Contact) -> ContactGroup:
+    """Contact group of `user_2`, contains `contact_5`."""
+    contact_group = ContactGroup.objects.create(
+        name="contact group 3",
+        user=user_2,
+    )
+    contact_group.contacts.set([
+        contact_5,
+    ])
+    return contact_group
+
+
 @pytest.fixture(autouse=True)
-def create_test_model_instances(contact_group_1: ContactGroup, contact_group_2: ContactGroup) -> None:
+def create_test_model_instances(
+    contact_group_1: ContactGroup,
+    contact_group_2: ContactGroup,
+    contact_group_3: ContactGroup,
+) -> None:
     """
     Create contacts, contact groups, users for test purposes.
 
@@ -158,36 +188,6 @@ def create_test_model_instances(contact_group_1: ContactGroup, contact_group_2: 
         ---------------------------------------
         user_2: [], []
     """
-
-
-@pytest.fixture(scope="module")
-def get_non_existent_uuid() -> GET_NON_EXISTENT_UUID_RETURN_TYPE:
-    """
-    Returns valid, but non-existent for the given queryset UUID.
-
-    This is a fixture, because of the need to access the database.
-    """
-
-    def _get_non_existent_uuid(queryset: QuerySet[Any]) -> UUID:
-        random_uuid = uuid4()
-        try:
-            queryset.get(uuid=random_uuid)
-        except queryset.model.DoesNotExist:
-            return random_uuid
-        else:
-            return _get_non_existent_uuid(queryset)
-
-    return _get_non_existent_uuid
-
-
-@pytest.fixture
-def non_existent_contact_uuid(get_non_existent_uuid: GET_NON_EXISTENT_UUID_RETURN_TYPE) -> UUID:
-    return get_non_existent_uuid(Contact.objects.all())
-
-
-@pytest.fixture
-def non_existent_contact_group_uuid(get_non_existent_uuid: GET_NON_EXISTENT_UUID_RETURN_TYPE) -> UUID:
-    return get_non_existent_uuid(ContactGroup.objects.all())
 
 
 def serialize_contact(contact: Contact) -> SERIALIZED_CONTACT:
@@ -345,7 +345,7 @@ class TestContactListView:
         "contact_post_data_factory_kwargs", (
             {"email": "invalid_email"},
             {"phone_number": "invalid_phone_number"},
-            {"contact_groups": ["invalid_contact_group_uuid"]},
+            # invalid uuid is covered by `test_post_can_not_create_contact_within_not_owned_contact_group`
         )
     )
     @assert_database_state_unchanged
@@ -360,24 +360,13 @@ class TestContactListView:
         self._assert_post_response_is_bad_request(data=data, user=user_1)
 
     @assert_database_state_unchanged
-    def test_post_non_existent_uuid_for_authenticated_user(
-        self,
-        contact_post_data_factory: CONTACT_POST_DATA_FACTORY_RETURN_TYPE,
-        non_existent_contact_group_uuid: UUID,
-        user_1: User,
-    ):
-        """A special case when given UUID is technically valid, but there is no contact group with such UUID."""
-        contact_group_uuids = [str(non_existent_contact_group_uuid)]
-        data = contact_post_data_factory(contact_groups=contact_group_uuids)
-        self._assert_post_response_is_bad_request(data=data, user=user_1)
-
-    @assert_database_state_unchanged
     def test_post_can_not_create_contact_within_not_owned_contact_group(
         self,
         contact_post_data_factory: CONTACT_POST_DATA_FACTORY_RETURN_TYPE,
         user_2: User,
         contact_group_1: ContactGroup,
     ):
+        """Check that 'POST /api/contacts/' with not owned contact group uuid responds with 400 BAD REQUEST."""
         data = contact_post_data_factory(contact_groups=[str(contact_group_1.uuid)])
         self._assert_post_response_is_bad_request(data=data, user=user_2)
 
@@ -475,19 +464,6 @@ class TestContactDetailView:
         assert expected_contact_data == response.data
 
     @assert_database_state_unchanged
-    def test_get_invalid_uuid_for_authenticated_user(
-        self,
-        non_existent_contact_uuid: UUID,
-        user_1: User,
-    ):
-        """Test that 'GET /api/contacts/<invalid_uuid>/' responds with 404 NOT FOUND for the authenticated user."""
-        api_client.force_authenticate(user=user_1)
-        endpoint = CONTACT_DETAIL_ENDPOINT.format(uuid=non_existent_contact_uuid)
-        response: Response = api_client.get(endpoint)
-
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-    @assert_database_state_unchanged
     def test_get_can_not_retrieve_not_owned_contact_for_authenticated_user(
         self,
         contact_1: Contact,
@@ -520,21 +496,6 @@ class TestContactDetailView:
         with pytest.raises(Contact.DoesNotExist):
             Contact.objects.get(uuid=contact_1.uuid)
         assert not ContactGroup.objects.filter(contacts__uuid=contact_1.uuid)
-
-    @assert_database_state_unchanged
-    def test_delete_non_existent_uuid_for_authenticated_user(
-        self,
-        non_existent_contact_uuid: UUID,
-        user_1: User,
-    ):
-        """
-        Test that 'DELETE /api/contacts/<non_existent_uuid>/' responds with 404 NOT FOUND for the authenticated user.
-        """
-        api_client.force_authenticate(user=user_1)
-        endpoint = CONTACT_DETAIL_ENDPOINT.format(uuid=non_existent_contact_uuid)
-        response: Response = api_client.delete(endpoint)
-
-        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     @assert_database_state_unchanged
     def test_delete_can_not_destroy_not_owned_contact_for_authenticated_user(
@@ -650,24 +611,13 @@ class TestContactGroupListView:
         self._assert_post_response_is_bad_request(data=data, user=user_1)
 
     @assert_database_state_unchanged
-    def test_post_non_existent_uuid_for_authenticated_user(
-        self,
-        contact_group_post_data_factory: CONTACT_GROUP_POST_DATA_FACTORY_RETURN_TYPE,
-        non_existent_contact_uuid: UUID,
-        user_1: User,
-    ):
-        """A special case when given UUID is technically valid, but there is no contact with such UUID."""
-        contact_uuids = [str(non_existent_contact_uuid)]
-        data = contact_group_post_data_factory(contacts=contact_uuids)
-        self._assert_post_response_is_bad_request(data=data, user=user_1)
-
-    @assert_database_state_unchanged
     def test_post_can_not_create_contact_group_with_not_owned_contact(
         self,
         contact_group_post_data_factory: CONTACT_GROUP_POST_DATA_FACTORY_RETURN_TYPE,
         user_2: User,
         contact_1: ContactGroup,
     ):
+        """Check that 'POST /api/contact_groups/' with not owned contact uuid responds with 400 BAD REQUEST."""
         data = contact_group_post_data_factory(contacts=[str(contact_1.uuid)])
         self._assert_post_response_is_bad_request(data=data, user=user_2)
 
@@ -777,17 +727,6 @@ class TestContactGroupDetailView:
         assert expected_contact_data == response.data
 
     @assert_database_state_unchanged
-    def test_get_invalid_uuid_for_authenticated_user(self, non_existent_contact_group_uuid: UUID, user_1: User):
-        """
-        Test that 'GET /api/contact_groups/<invalid_uuid>/' responds with 404 NOT FOUND for the authenticated user.
-        """
-        api_client.force_authenticate(user=user_1)
-        endpoint = CONTACT_GROUP_DETAIL_ENDPOINT.format(uuid=non_existent_contact_group_uuid)
-        response: Response = api_client.get(endpoint)
-
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-    @assert_database_state_unchanged
     def test_get_can_not_retrieve_not_owned_contact_group_for_authenticated_user(
         self,
         contact_group_1: ContactGroup,
@@ -824,25 +763,14 @@ class TestContactGroupDetailView:
         assert not Contact.objects.filter(contact_group__uuid=contact_group_1.uuid)
 
     @assert_database_state_unchanged
-    def test_delete_non_existent_uuid_for_authenticated_user(self, non_existent_contact_group_uuid: UUID, user_1: User):
-        """
-        Test that 'DELETE /api/contact_groups/<non_existent_uuid>/' responds with 404 NOT FOUND for the
-        authenticated user.
-        """
-        api_client.force_authenticate(user=user_1)
-        endpoint = CONTACT_GROUP_DETAIL_ENDPOINT.format(uuid=non_existent_contact_group_uuid)
-        response: Response = api_client.delete(endpoint)
-
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-    @assert_database_state_unchanged
     def test_delete_can_not_destroy_not_owned_contact_group_for_authenticated_user(
         self,
         contact_group_1: ContactGroup,
         user_2: User,
     ):
         """
-        Test that 'DELETE /api/contact_groups/<not_owned_uuid>/' responds with 404 NOT FOUND for the authenticated user.
+        Test that 'DELETE /api/contact_groups/<not_owned_uuid>/' responds with 404 NOT FOUND, and an expected message
+        for the authenticated user.
         """
         api_client.force_authenticate(user=user_2)
         endpoint = CONTACT_GROUP_DETAIL_ENDPOINT.format(uuid=contact_group_1.uuid)
