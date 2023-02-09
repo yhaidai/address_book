@@ -234,9 +234,11 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
                           303 SEE OTHER, serialized contact - if this contact is already in the group
                           200 OK, serialized contact - if the contact has been successfully added to the group
         """
+        user = request.user
         contact_uuid = request.data["uuid"]
+
         try:
-            contact: Contact = Contact.objects.get(uuid=contact_uuid)
+            contact: Contact = Contact.objects.get(uuid=contact_uuid, user=user)  # type: ignore
         except Contact.DoesNotExist:
             return Response(
                 {"detail": f"Contact with UUID '{contact_uuid}' does not exist for your user."},
@@ -245,7 +247,7 @@ class ContactGroupAddListContactsView(ListCreateAPIView):
 
         contact_group_uuid: UUID = self.kwargs["contact_group_uuid"]
         try:
-            contact_group: ContactGroup = ContactGroup.objects.get(uuid=contact_group_uuid)
+            contact_group: ContactGroup = ContactGroup.objects.get(uuid=contact_group_uuid, user=user)  # type: ignore
         except ContactGroup.DoesNotExist:
             return Response(
                 {"detail": f"ContactGroup with UUID '{contact_group_uuid}' does not exist for your user."},
