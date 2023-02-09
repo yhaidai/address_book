@@ -2,7 +2,7 @@ import functools
 from collections import OrderedDict
 from itertools import chain, combinations
 from typing import Any, Callable, Iterable, TypeAlias, TypeVar
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from django.apps import apps
 from django.db.models import ForeignObjectRel, Model, QuerySet
@@ -20,6 +20,7 @@ CONTACT_LIST_ENDPOINT = "/api/contacts/"
 CONTACT_DETAIL_ENDPOINT = "/api/contacts/{uuid}/"
 CONTACT_GROUP_LIST_ENDPOINT = "/api/contact_groups/"
 CONTACT_GROUP_DETAIL_ENDPOINT = "/api/contact_groups/{uuid}/"
+CONTACT_GROUP_CONTACT_LIST_ENDPOINT = "/api/contact_groups/{contact_group_uuid}/contacts/"
 CONTACT_GROUP_CONTACT_DETAIL_ENDPOINT = "/api/contact_groups/{contact_group_uuid}/contacts/{contact_uuid}/"
 
 
@@ -436,10 +437,9 @@ class TestContactListView:
 
         :param expected_user: `User` instance under which the contact data was POSTed - to check it is saved to the DB
         """
-        uuid = UUID(post_response_data["uuid"])  # type: ignore
-        created_contact = Contact.objects.get(uuid=uuid)
-        contact_expected_api_repr = serialize_contact(created_contact)
-        assert contact_expected_api_repr == post_response_data
+        created_contact = Contact.objects.get(uuid=post_response_data["uuid"])  # type: ignore
+        serialized_contact = serialize_contact(created_contact)
+        assert serialized_contact == post_response_data
         assert created_contact.user == expected_user
 
 
@@ -777,3 +777,247 @@ class TestContactGroupDetailView:
         response: Response = api_client.delete(endpoint)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestContactGroupRemoveContactView:
+
+    @assert_database_state_unchanged
+    def test_delete_is_not_accessible_by_anonymous_users(self, contact_1: Contact, contact_group_1: ContactGroup):
+        api_client.force_authenticate(user=None)
+        endpoint = CONTACT_GROUP_CONTACT_DETAIL_ENDPOINT.format(
+            contact_group_uuid=str(contact_group_1.uuid),
+            contact_uuid=str(contact_1.uuid),
+        )
+        response: Response = api_client.delete(endpoint)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_delete_valid_uuid_for_authenticated_user(
+        self,
+        user_1: User,
+        contact_1: Contact,
+        contact_group_1: ContactGroup,
+    ):
+        """
+        Test that 'DELETE /api/contact_groups/<valid_group_uuid>/contacts/<valid_contact_uuid>' responds with
+        204 NO CONTENT, and the link between contact and group is removed, however the contact itself still remains.
+        """
+        api_client.force_authenticate(user=user_1)
+        endpoint = CONTACT_GROUP_CONTACT_DETAIL_ENDPOINT.format(
+            contact_group_uuid=contact_group_1.uuid,
+            contact_uuid=contact_1.uuid,
+        )
+        response: Response = api_client.delete(endpoint)
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        with pytest.raises(Contact.DoesNotExist):
+            contact_group_1.contacts.get(uuid=contact_1.uuid)
+        with pytest.raises(ContactGroup.DoesNotExist):
+            contact_1.contact_groups.get(uuid=contact_group_1.uuid)
+        assert user_1.contacts.filter(uuid=contact_1.uuid)
+
+    @assert_database_state_unchanged
+    def test_delete_can_not_destroy_not_owned_contact_for_authenticated_user(
+        self,
+        contact_5: Contact,
+        contact_group_1: ContactGroup,
+        user_1: User,
+    ):
+        """
+        Test that 'DELETE /api/contact_groups/<valid_group_uuid>/contacts/<not_owned_contact_uuid>' responds with
+        404 NOT FOUND and an expected message for the authenticated user.
+        """
+        api_client.force_authenticate(user=user_1)
+        endpoint = CONTACT_GROUP_CONTACT_DETAIL_ENDPOINT.format(
+            contact_group_uuid=contact_group_1.uuid,
+            contact_uuid=contact_5.uuid,
+        )
+
+        response: Response = api_client.delete(endpoint)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data == {
+            "detail": f"Contact with UUID '{contact_5.uuid}' does not exist for your user.",
+        }
+
+    @assert_database_state_unchanged
+    def test_delete_can_not_destroy_owned_contact_within_not_owned_contact_group_for_authenticated_user(
+        self,
+        contact_1: Contact,
+        contact_group_3: ContactGroup,
+        user_1: User,
+    ):
+        """
+        Test that 'DELETE /api/contact_groups/<not_owned_contact_group_uuid>/contacts/<valid_contact_uuid>' responds
+        with 404 NOT FOUND and an expected message for the authenticated user.
+        """
+        api_client.force_authenticate(user=user_1)
+        endpoint = CONTACT_GROUP_CONTACT_DETAIL_ENDPOINT.format(
+            contact_group_uuid=contact_group_3.uuid,
+            contact_uuid=contact_1.uuid,
+        )
+
+        response: Response = api_client.delete(endpoint)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data == {
+            "detail": f"ContactGroup with UUID '{contact_group_3.uuid}' does not exist for your user.",
+        }
+
+    @assert_database_state_unchanged
+    def test_delete_can_not_destroy_not_owned_contact_within_its_contact_group_for_authenticated_user(
+        self,
+        contact_1: Contact,
+        contact_group_1: ContactGroup,
+        user_2: User,
+    ):
+        """
+        Test that 'DELETE /api/contact_groups/<not_owned_contact_group_uuid>/contacts/<not_owned_contact_uuid>' responds
+        with 404 NOT FOUND for the authenticated user.
+        """
+
+        api_client.force_authenticate(user=user_2)
+        endpoint = CONTACT_GROUP_CONTACT_DETAIL_ENDPOINT.format(
+            contact_group_uuid=contact_group_1.uuid,
+            contact_uuid=contact_1.uuid,
+        )
+        response: Response = api_client.delete(endpoint)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+class TestContactGroupAddListContactsView:
+
+    @assert_database_state_unchanged
+    def test_get_is_not_accessible_by_anonymous_users(self, contact_group_1: ContactGroup):
+        api_client.force_authenticate(user=None)
+        endpoint = CONTACT_GROUP_CONTACT_LIST_ENDPOINT.format(contact_group_uuid=contact_group_1.uuid)
+        response = api_client.get(endpoint)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @assert_database_state_unchanged
+    def test_get_valid_uuid_for_authenticated_user(self, user_1: User, contact_group_1: ContactGroup):
+        """
+        Test that 'GET /api/contact_groups/<valid_uuid>/contacts/' responds with 200 OK and a list of contacts
+        for the authenticated user.
+        """
+        api_client.force_authenticate(user=user_1)
+        endpoint = CONTACT_GROUP_CONTACT_LIST_ENDPOINT.format(contact_group_uuid=contact_group_1.uuid)
+        response: Response = api_client.get(endpoint)
+
+        assert response.status_code == status.HTTP_200_OK
+        self._assert_get_response_data_matches_groups_contacts(response.data, contact_group_1)
+
+    @assert_database_state_unchanged
+    def test_get_not_owned_uuid_for_authenticated_user(self, user_1: User, contact_group_3: ContactGroup):
+        """
+        Test that 'GET /api/contact_groups/<not_owned_uuid>/contacts/' responds with 200 OK and a list of contacts
+        for the authenticated user.
+        """
+        api_client.force_authenticate(user=user_1)
+        endpoint = CONTACT_GROUP_CONTACT_LIST_ENDPOINT.format(contact_group_uuid=contact_group_3.uuid)
+        response: Response = api_client.get(endpoint)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @assert_database_state_unchanged
+    def test_post_is_not_accessible_by_anonymous_users(self, contact_group_1: ContactGroup, contact_4: Contact):
+        api_client.force_authenticate(user=None)
+        endpoint = CONTACT_GROUP_CONTACT_LIST_ENDPOINT.format(contact_group_uuid=contact_group_1.uuid)
+        response = api_client.post(endpoint, data={"uuid": str(contact_4.uuid)})
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @assert_database_state_unchanged
+    def test_post_can_not_add_contact_to_not_owned_contact_group_for_authenticated_user(
+        self,
+        user_1: User,
+        contact_group_3: ContactGroup,
+        contact_4: Contact,
+    ):
+        """
+        Test that 'POST /api/contact_groups/<not_owned_uuid>/contacts/ {"uuid": "<owned_contact_uuid>"}' responds with
+        404 NOT FOUND and an expected message for the authenticated user.
+        """
+        api_client.force_authenticate(user=user_1)
+        endpoint = CONTACT_GROUP_CONTACT_LIST_ENDPOINT.format(contact_group_uuid=contact_group_3.uuid)
+        response = api_client.post(endpoint, data={"uuid": str(contact_4.uuid)})
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data == {
+            "detail": f"ContactGroup with UUID '{contact_group_3.uuid}' does not exist for your user."
+        }
+
+    @assert_database_state_unchanged
+    def test_post_can_not_add_not_owned_contact_to_owned_contact_group_for_authenticated_user(
+        self,
+        user_1: User,
+        contact_group_1: ContactGroup,
+        contact_5: Contact,
+    ):
+        """
+        Test that 'POST /api/contact_groups/<owned_uuid>/contacts/ {"uuid": "<not_owned_contact_uuid>"}' responds with
+        404 NOT FOUND and an expected message for the authenticated user.
+        """
+        api_client.force_authenticate(user=user_1)
+        endpoint = CONTACT_GROUP_CONTACT_LIST_ENDPOINT.format(contact_group_uuid=contact_group_1.uuid)
+        response = api_client.post(endpoint, data={"uuid": str(contact_5.uuid)})
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data == {
+            "detail": f"Contact with UUID '{contact_5.uuid}' does not exist for your user."
+        }
+
+    def test_post_valid_data_for_authenticated_user(
+        self,
+        contact_4: Contact,
+        contact_group_1: ContactGroup,
+        user_1: User,
+    ):
+        """
+        Check that 'POST /api/contact_groups/<valid_uuid>/contacts/' with a valid data responds with 200 OK and an
+        accordingly serialized contact instance, which was added to the group.
+        """
+        api_client.force_authenticate(user=user_1)
+        endpoint = CONTACT_GROUP_CONTACT_LIST_ENDPOINT.format(contact_group_uuid=contact_group_1.uuid)
+        contact_uuid_str = str(contact_4.uuid)
+        response = api_client.post(endpoint, data={"uuid": contact_uuid_str})
+
+        assert response.status_code == status.HTTP_200_OK
+        response_data: SERIALIZED_CONTACT = response.data
+
+        # Response data must correspond to the POSTed data
+        assert contact_uuid_str == response_data["uuid"]
+
+        # Response data must correspond to the actual contact with the UUID which was POSTed
+        added_contact: Contact = Contact.objects.get(uuid=contact_uuid_str)
+        serialized_contact = serialize_contact(added_contact)
+        assert serialized_contact == response_data
+
+        # Target contact and group should now be linked
+        assert contact_group_1 in added_contact.contact_groups.all()
+        assert added_contact in contact_group_1.contacts.all()
+
+    @assert_database_state_unchanged
+    def test_post_insufficient_data_for_authenticated_user(
+        self,
+        user_1: User,
+        contact_group_1: ContactGroup,
+    ):
+        """
+        Check that ''POST /api/contact_groups/<valid_uuid>/contacts/' with an insufficient data responds with
+        400 BAD REQUEST.
+        """
+        api_client.force_authenticate(user=user_1)
+        response = api_client.post(CONTACT_GROUP_LIST_ENDPOINT, data={})
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @staticmethod
+    def _assert_get_response_data_matches_groups_contacts(
+        get_response_data: SERIALIZED_CONTACT,
+        contact_group: ContactGroup,
+    ) -> None:
+        """Check that ALL contacts of the group and ONLY contacts of the group are present in the response."""
+        contact_group_contacts = contact_group.contacts.all()
+        assert len(get_response_data) == len(contact_group_contacts)
+        for contact in contact_group_contacts:
+            expected_contact_data = serialize_contact(contact)
+            assert expected_contact_data in get_response_data
