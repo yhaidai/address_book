@@ -1,11 +1,8 @@
-import functools
 from collections import OrderedDict
-from itertools import chain, combinations
-from typing import Any, Callable, Iterable, TypeAlias, TypeVar
+from typing import Any, Callable, Iterable, TypeAlias
 from uuid import UUID
 
-from django.apps import apps
-from django.db.models import ForeignObjectRel, Model, QuerySet
+from django.db.models import QuerySet
 
 import pytest
 from mypy_extensions import DefaultArg, KwArg
@@ -13,6 +10,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APIClient
 
+from address_book.conftest import assert_database_state_unchanged, powerset
 from address_book.contacts.models import Contact, ContactGroup
 from address_book.users.models import User
 
@@ -27,7 +25,6 @@ from .test_urls import (
 )
 
 # Typing
-T = TypeVar("T")
 GET_NON_EXISTENT_UUID_RETURN_TYPE: TypeAlias = Callable[[QuerySet[Any]], UUID]
 POSTED_CONTACT: TypeAlias = dict[str, str | list[str]]
 CONTACT_POST_DATA_FACTORY_RETURN_TYPE: TypeAlias = Callable[
@@ -41,17 +38,10 @@ SERIALIZED_CONTACT: TypeAlias = OrderedDict[str, str | list[UUID]]
 POSTED_CONTACT_GROUP: TypeAlias = POSTED_CONTACT
 CONTACT_GROUP_POST_DATA_FACTORY_RETURN_TYPE: TypeAlias = CONTACT_POST_DATA_FACTORY_RETURN_TYPE
 SERIALIZED_CONTACT_GROUP: TypeAlias = SERIALIZED_CONTACT
-SERIALIZED_QUERYSET = tuple[dict[str, Any], ...]
 
 pytestmark = pytest.mark.django_db
 
 api_client = APIClient()
-
-
-def powerset(iterable: Iterable[T]) -> chain[tuple[T, ...]]:
-    """powerset([1, 2, 3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"""
-    s = list(iterable)
-    return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
 
 
 def serialize_contact(contact: Contact) -> SERIALIZED_CONTACT:
@@ -73,48 +63,6 @@ def serialize_contact_group(contact_group: ContactGroup) -> SERIALIZED_CONTACT_G
         contacts=[contact.uuid for contact in contact_group.contacts.all()],
         uuid=str(contact_group.uuid),
     )
-
-
-def serialize_queryset(model_class: type[Model]) -> SERIALIZED_QUERYSET:
-    """
-    Serialize queryset for a given model class, including fields evaluation.
-
-    Used to make the comparison of otherwise LAZY querysets in `assert_database_state_unchanged` trivial.
-    Excludes fields for backward relationships - such relationships will be traversed anyway in a forward manner.
-    """
-    queryset = model_class.objects.all()
-    result = tuple(
-        {
-            field.name: field.value_from_object(obj)  # type: ignore
-            for field in model_class._meta.get_fields()
-            if not isinstance(field, ForeignObjectRel)  # Skip fields for backward relationships
-        }
-        for obj in queryset
-    )
-    return result
-
-
-def get_serialized_model_querysets() -> tuple[SERIALIZED_QUERYSET, ...]:
-    """Return serialized querysets for all models."""
-    return tuple(serialize_queryset(model_class) for model_class in apps.get_models())
-
-
-def assert_database_state_unchanged(func: Callable):
-    """Decorator for tests to ensure that the state of the database remains the same at the end of test execution."""
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        initial_querysets = get_serialized_model_querysets()
-
-        result = func(*args, **kwargs)
-
-        eventual_querysets = get_serialized_model_querysets()
-        for initial_queryset, eventual_queryset in zip(initial_querysets, eventual_querysets):
-            assert initial_queryset == eventual_queryset
-
-        return result
-
-    return wrapper
 
 
 class TestContactListView:
